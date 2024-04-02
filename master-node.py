@@ -1,5 +1,7 @@
 import threading
 import socket
+import heart_beat
+from asyncio import run
 import yaml
 from pathlib import Path
 import json 
@@ -81,7 +83,15 @@ def server():
         conn.close()
 
 def heartbeat():
-    pass
+    responsible_node_url = "http://127.0.0.1:5000/report"
+    node_urls = [
+        "https://github.com/iiteen",
+        "https://github.com/wadetb/heartbeat",
+        "http://127.0.0.1:80/",
+        # Add more node URLs as needed
+    ]
+
+    run(heart_beat.main(node_urls, responsible_node_url))
 
 
 def main():
