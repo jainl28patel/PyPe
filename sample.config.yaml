@@ -1,0 +1,10 @@
+nodes:
+  - node1:
+      ip:
+      task:
+  - node2:
+      ip:
+      task:
+  - node3:
+      ip:
+      task:

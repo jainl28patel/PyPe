@@ -1,9 +1,30 @@
 import threading
 import socket
+import yaml
+from pathlib import Path
+import json 
+
+NODES = []
+
+def load_config():
+    # load yaml
+    config_path = Path("config.yaml")
+    if not config_path.exists():
+        print("config.yaml not found.") 
+        return
+    with open('config.yaml') as file:
+        config = yaml.full_load(file)
+        for node in config["nodes"]:
+            NODES.append(node)
+        print(NODES)
 
 def handle_request(data):
     # Parse data and send to respective node
-    pass
+    # result = '{"req_id":1, "task": "t1"}'
+    result = json.loads(data)
+    # print(result["task"])
+    
+    
 
 def server():
     # Listen for incoming headers and send to respective nodes or stores in queue
@@ -22,6 +43,8 @@ def heartbeat():
 
 
 def main():
+    load_config()
+    
     server_thread = threading.Thread(target=server)
     heartbeat_thread = threading.Thread(target=heartbeat)
 
@@ -29,7 +52,7 @@ def main():
     heartbeat_thread.start()
 
     server_thread.join()
-    heartbeat_thread.join()
+    heartbeat_thread.join()    
 
 if __name__ == "__main__":
     main()

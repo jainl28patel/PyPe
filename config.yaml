@@ -1,0 +1,10 @@
+nodes:
+  - node1:
+      ip: 10.81.49.125
+      task: t1
+  - node2:
+      ip: 10.81.49.126
+      task: t2
+  - node3:
+      ip: 10.81.49.127
+      task: t3
