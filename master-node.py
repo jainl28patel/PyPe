@@ -1,5 +1,6 @@
 import threading
 import socket
+from time import sleep
 import heart_beat
 from asyncio import run
 import yaml
@@ -147,6 +148,13 @@ def heartbeat():
 
     run(heart_beat.main(node_urls))
 
+def handle_pending_tasks():
+    while True:
+        task = taskQueue.get_task()
+        if task:
+            handle_request(json.dumps(task))
+
+        sleep(5)
 
 def main():
     global NODE, RR
@@ -156,12 +164,15 @@ def main():
     
     server_thread = threading.Thread(target=server)
     heartbeat_thread = threading.Thread(target=heartbeat)
+    pending_task_thread = threading.Thread(target=handle_pending_tasks)
 
     server_thread.start()
     heartbeat_thread.start()
+    pending_task_thread.start()
 
     server_thread.join()
     heartbeat_thread.join()
+    pending_task_thread.join()
 
 
 # Global variables
