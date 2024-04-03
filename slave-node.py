@@ -7,9 +7,12 @@ import json
 import subprocess
 import sqlite3
 from enum import Enum
-
+from time import sleep 
 # required
 NODE_NAME = "node1"
+NODE_IP='10.61.119.144'
+MASTER_IP=""
+HEARTBEAT_PORT=9000
 
 # global variables
 slave = None
@@ -22,9 +25,21 @@ slave = None
             response: str,
             action: str
         },
-        client_ip: str
+        host_ip: str,
+        host_port: int
     }
 '''
+
+# Create a thread-local data container
+mydata = threading.local()
+
+def get_db():
+    # Ensure a unique connection per thread
+    if not hasattr(mydata, "conn"):
+        mydata.conn = sqlite3.connect(f'task_{NODE_NAME}.db')
+    return mydata.conn
+
+
 class TaskType(Enum):
     BASH = 1
     PYTHON = 2
@@ -37,35 +52,50 @@ class NodeTaskQueue:
         NodeTaskQueue.dbname = f'{db_name}'
         
         self.lock = threading.Lock()
-        self.conn = sqlite3.connect(f"{NodeTaskQueue.dbname}.db")
-        self.c = self.conn.cursor()
-        self.c.execute(f'''CREATE TABLE IF NOT EXISTS {NodeTaskQueue.dbname}
-             (task_id text, data text, client_ip str)''')
-        self.c.execute(f'''CREATE UNIQUE INDEX IF NOT EXISTS task_id_index
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(f'''CREATE TABLE IF NOT EXISTS {NodeTaskQueue.dbname}
+             (task_id text, data text, host_ip text, host_port int)''')
+        c.execute(f'''CREATE UNIQUE INDEX IF NOT EXISTS task_id_index
              ON {NodeTaskQueue.dbname} (task_id)''')
-        self.conn.commit()
+        conn.commit()
 
-    def add_task(self, task_id: str, data: str, client_ip: str):
+    def add_task(self, task_id: str, data: str, host_ip: str, host_port: int):
         with self.lock:
             try:
-                self.c.execute(f"INSERT INTO {NodeTaskQueue.dbname} VALUES (?, ?, ?)", (task_id, data, client_ip))
-                self.conn.commit()
+                conn = get_db()
+                c = conn.cursor()
+                print(task_id)
+                print(data)
+                print(host_ip)
+                print(host_port)
+                c.execute(f"INSERT INTO {NodeTaskQueue.dbname} VALUES (?, ?, ?, ?)", (task_id, str(data), host_ip, host_port))
+                conn.commit()
+                
+                print(self.get_task("1212"))
             except sqlite3.IntegrityError:
                 return "Task already exists in the queue."
 
     def get_all_task(self):
         with self.lock:
             try:
-                self.c.execute(f"SELECT data FROM {NodeTaskQueue.dbname}")
-                return self.c.fetchall()
+                conn = get_db()
+                c = conn.cursor()
+                c.execute(f"SELECT data FROM {NodeTaskQueue.dbname}")
+                return c.fetchall()
             except sqlite3.IntegrityError:
                 return "Task does not exist in the queue."
     
     def get_task(self, task_id: str):
         with self.lock:
             try:
-                self.c.execute(f"SELECT data, client_ip FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
-                res = self.c.fetchone() 
+                # TODO: modify below to include host_ip, host_port
+                # self.c.execute(f"SELECT data, host_ip, host_port FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
+                conn = get_db()
+                c = conn.cursor()
+                c.execute(f"SELECT data FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
+                res = c.fetchone()
+                print("res: ",res) 
                 return res[0]
             except sqlite3.IntegrityError:
                 return "Task does not exist in the queue."
@@ -73,13 +103,16 @@ class NodeTaskQueue:
     def remove_task(self, task_id: str):
         with self.lock:
             try:
-                self.c.execute(f"DELETE FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
-                self.conn.commit()
+                conn = get_db()
+                c = conn.cursor()
+                c.execute(f"DELETE FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
+                conn.commit()
             except sqlite3.IntegrityError:
                 return "Task does not exist in the queue."
 
     def __del__(self):
-        self.conn.close()
+        conn = get_db()
+        conn.close()
 
 class Slave:
     def __init__(self) -> None:
@@ -107,10 +140,10 @@ class Slave:
     def pop_task_id(self, task_id : str):
         self.request_queue.remove_task(task_id)
     
-    def handle_request(self, data: str):
+    def handle_request(self, data: str, host_ip: str, host_port: int):
         # parses data from client and stores in the queue
         res = json.loads(data)
-        self.request_queue.add_task(res["task_id"],res["data"])
+        self.request_queue.add_task(res["task_id"],json.dumps(res["data"]),host_ip,host_port)
     
     def process_bash_task(self, action: str ):
         output = subprocess.check_output(action, shell=True)
@@ -118,8 +151,8 @@ class Slave:
     
     def process_task(self, task_id: str):
         task = json.loads(self.request_queue.get_task(task_id))
+        print("task : ", task)
         task_type = None
-
         if task["type"]== "bash":
             task_type = TaskType.BASH
         elif task["type"]== "python":
@@ -134,22 +167,22 @@ class Slave:
         
         return None
 
-    def handle_data(self, data: str):
+    def handle_data(self, data: str, host_ip: str, host_port: int):
         # either data from client or master
         res = json.loads(data)
         for key in res.keys():
             if key == "data":
-                self.handle_request(data)
+                self.handle_request(data, host_ip, host_port)
                 break
             elif key == "task":
                 # master
-                self.handle_task(int(res["task_id"]),res["node_name"],res["task"])
+                self.handle_task(int(res["task_id"]),res["task"],res["to_execute"])
                 break
         
-    def handle_task(self, task_id: str, node_name: str, task: str):
+    def handle_task(self, task_id: str, task: str, to_execute: str):
         # handles the task given from the master
         # or pops it from queue
-        if (node_name == self.name):
+        if (int(to_execute) == 1):
             if (task == self.task):
                 # TODO: Change this
                 print(self.process_task(task_id))
@@ -162,13 +195,15 @@ class Slave:
         
 def load_config():
     # load yaml
-    global slave
+    global slave,MASTER_IP,HEARTBEAT_PORT
     config_path = Path("config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
         return
     with open('config.yaml') as file:
         config = yaml.full_load(file)
+        MASTER_IP = config["master"]["ip"]
+        HEARTBEAT_PORT = config["heartbeat-port"]
         for node in config["nodes"]:
             node_name = next(iter(node))
             if(node_name == NODE_NAME):
@@ -186,30 +221,44 @@ def load_config():
 def slave_server():
     global slave
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('localhost', slave.get_port())) 
+    server.bind((NODE_IP, slave.get_port())) 
     server.listen(5)
     print("started listening on: ", slave.get_port())
 
     while True:
         conn, addr = server.accept()
-        print("sssss")
         data = conn.recv(1024)
         host, port = conn.getpeername()
-        print("ip: ",host,port)
+        print(f"recieved from ip: {host} port: {port}")
         print(data)
-        slave.handle_data(data)
+        slave.handle_data(data,host,port)
         
         conn.close()
-    
-def main():
-    load_config()
-    slave_server()
-    
-    # slave_server_thread = threading.Thread(target=slave_server)
 
-    # slave_server_thread.start()
+def start_health():
+    while True:
+        try:
+            heartbeat = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            heartbeat.connect((MASTER_IP, HEARTBEAT_PORT))
+            heartbeat.sendall(b'{"status":"up"}')
+            heartbeat.close()
+        except:
+            pass
+        sleep(15)
+        
+
+def main():
+    if not load_config():
+        return
+      
+    slave_server_thread = threading.Thread(target=slave_server)
+    start_health_thread = threading.Thread(target=start_health)
+
+    slave_server_thread.start()
+    start_health_thread.start()
     
-    # slave_server_thread.join()
+    slave_server_thread.join()
+    start_health_thread.join()
 
 if __name__ == "__main__":
     main()
