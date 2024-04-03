@@ -1,10 +1,27 @@
+# type - "bash", "python", "https"
+# response - "text", "image", "blob"
+
+tasks:
+    - t1:
+        type:
+        response:
+    - t2:
+        type:
+        response:
+    - t3:
+        type: 
+        response:
+
 nodes:
   - node1:
       ip:
+      port:
       task:
   - node2:
       ip:
+      port:
       task:
   - node3:
       ip:
+      port:
       task:
