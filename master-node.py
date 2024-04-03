@@ -76,8 +76,35 @@ def load_config():
             NODE.add(node)
 
 def handle_request(data):
-    pass
-    
+    """
+    Tentative data format:
+        {
+            "task": "task_name",
+            "task_id": "task_id",
+        }
+    """
+
+    data = json.loads(data)
+    task = data["task"]
+    task_id = data["task_id"]
+    data["to_execute"] = False
+
+    ip_dest = RR.get_ip(task)
+    ip_list = NODE.get_all_ip()
+
+    # Send task to node
+    for ip in ip_list:
+        if ip == ip_dest:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((ip, 8000)) # later change to node IP as per yaml file
+            data["to_execute"] = True
+            sock.sendall(json.dumps(data).encode())
+            sock.close()
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((ip, 8000)) # later change to node IP as per yaml file
+            sock.sendall(json.dumps(data).encode())
+            sock.close()
 
 def server():
     # Listen for incoming headers and send to respective nodes or stores in queue
@@ -85,11 +112,11 @@ def server():
     server.bind(('localhost', 8000))    # later change to master node IP as per yaml file
     server.listen(5)
 
+    # handle incoming requests using different threads
     while True:
         conn, addr = server.accept()
-        data = conn.recv(1024)
-        handle_request(data)
-        conn.close()
+        data = conn.recv(1024).decode()
+        threading.Thread(target=handle_request, args=(data,)).start()
 
 def heartbeat():
     # responsible_node_url = "http://127.0.0.1:5000/report"
