@@ -9,6 +9,12 @@ tasks:
         type: "bash"
         response: "text"
 
+master:
+    ip: 10.61.8.75
+    port: 6969
+
+heartbeat-port: 9000
+
 nodes:
   - node1:
       ip: 10.81.49.125

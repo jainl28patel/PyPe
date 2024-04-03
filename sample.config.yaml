@@ -12,6 +12,12 @@ tasks:
         type: 
         response:
 
+master:
+    ip:
+    port:
+
+heartbeat-port:
+
 nodes:
   - node1:
       ip:

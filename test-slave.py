@@ -7,7 +7,7 @@ def send_hello(address, port):
         s.connect((address, port))
         
         # Send "hello" message
-        s.sendall(b'hello')
+        s.sendall(b'{"task_id":"1212", "data": {"type":"bash", "response":"text", "action": "echo hi > hi.txt" }}')
         
         # Receive the response from the server, if you expect one
         data = s.recv(1024)
