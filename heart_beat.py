@@ -1,10 +1,29 @@
 import asyncio
 import aiohttp
 import json
+import threading
+
+class Node_Health:
+    def __init__ (self, node_urls):
+        self.node_urls = {}
+        for url in node_urls:
+            self.node_urls[url] = "down"
+        self.lock = threading.Lock()
+
+    def __str__(self):
+        with self.lock:
+            return json.dumps(self.node_urls, indent=4)
+        
+    def update_health(self, url, status):
+        with self.lock:
+            self.node_urls[url] = status
+
+    def get_data(self):
+        with self.lock:
+            return self.node_urls.copy()
 
 # Dictionary to store the health of each node
-nodes_health = {}
-
+nodes_health = None
 
 # Function to check the health of a node
 async def check_node_health(node_url, session):
@@ -17,43 +36,26 @@ async def check_node_health(node_url, session):
     except aiohttp.ClientError:
         return "down"
 
-
-# Function to send the health data to the responsible node
-async def send_health_data(responsible_node_url, health_data, session):
-    try:
-        # Convert the health data to JSON
-        health_data_json = json.dumps(health_data)
-        # Send the health data via POST request
-        async with session.post(
-            responsible_node_url, json=health_data_json
-        ) as response:
-            if response.status == 200:
-                print("Health data sent successfully.")
-            else:
-                print("Failed to send health data.")
-    except aiohttp.ClientError as e:
-        print(f"An error occurred: {e}")
-
-
 # Main function to orchestrate the heartbeat checks
-async def main(node_urls, responsible_node_url):
+async def main(node_urls):
     global nodes_health
+    nodes_health = Node_Health(node_urls)
     async with aiohttp.ClientSession() as session:
         while True:
-            # Store the previous health data to detect changes
-            previous_health = nodes_health.copy()
-
             # Asynchronously check the health of each node
             tasks = [check_node_health(url, session) for url in node_urls]
             health_results = await asyncio.gather(*tasks)
 
             # Update the nodes_health dictionary with the new health results
-            nodes_health = dict(zip(node_urls, health_results))
+            new_nodes_health = dict(zip(node_urls, health_results))
 
             # Check if there's a change in the health status
-            if nodes_health != previous_health:
-                # Send the updated health data to the responsible node
-                await send_health_data(responsible_node_url, nodes_health,session)
+            previous_nodes_health = nodes_health.get_data()
+            if new_nodes_health != previous_nodes_health:
+                # update the nodes_health dictionary
+                for url, status in new_nodes_health.items():
+                    if status != previous_nodes_health[url]:
+                        nodes_health.update_health(url, status)
 
             # Wait for some time before the next check
             await asyncio.sleep(10)  # Check every 10 seconds

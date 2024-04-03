@@ -5,6 +5,7 @@ from asyncio import run
 import yaml
 from pathlib import Path
 import json 
+from heart_beat import nodes_health
 
 class Node:
     def __init__(self) -> None:
@@ -34,6 +35,14 @@ class Node:
             for node in self.node:
                 name = next(iter(node))
                 ret.add(node[name]["task"])
+            return ret
+        
+    def get_all_ip(self):
+        with self.lock:
+            ret = []
+            for node in self.node:
+                name = next(iter(node))
+                ret.append(node[name]["ip"])
             return ret
 
 class RoundRobin:
@@ -83,15 +92,21 @@ def server():
         conn.close()
 
 def heartbeat():
-    responsible_node_url = "http://127.0.0.1:5000/report"
-    node_urls = [
-        "https://github.com/iiteen",
-        "https://github.com/wadetb/heartbeat",
-        "http://127.0.0.1:80/",
-        # Add more node URLs as needed
-    ]
+    # responsible_node_url = "http://127.0.0.1:5000/report"
+    # node_urls = [
+    #     "https://github.com/iiteen",
+    #     "https://github.com/wadetb/heartbeat",
+    #     "http://127.0.0.1:80/",
+    #     # Add more node URLs as needed
+    # ]
 
-    run(heart_beat.main(node_urls, responsible_node_url))
+    node_urls = []
+    for ip in NODE.get_all_ip():
+        node_urls.append(f"http://{ip}/report")
+
+    print(node_urls)
+
+    run(heart_beat.main(node_urls))
 
 
 def main():
@@ -111,6 +126,7 @@ def main():
 
 
 # Global variables
+# Node health imported from heart_beat.py
 NODE = None
 RR = None
 
