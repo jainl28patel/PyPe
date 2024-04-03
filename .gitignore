@@ -1,0 +1,5 @@
+assets/
+__pycache__/
+virenv/
+animal_names.txt
+*.jpg

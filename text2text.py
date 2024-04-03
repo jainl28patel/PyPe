@@ -75,6 +75,6 @@ def query(client, text):
 
 if __name__=="__main__": 
     client = connect()
-    # db_fill(client)
+    db_fill(client)
     query(client,"time travel")
     client.close()

@@ -6,6 +6,7 @@ from weaviate.util import generate_uuid5
 from datetime import datetime, timezone
 from transformers import AutoFeatureExtractor,ResNetModel
 from PIL import Image
+from utils import connect
 
 processor = AutoFeatureExtractor.from_pretrained('Ramos-Ramos/dino-resnet-50')
 model = ResNetModel.from_pretrained('Ramos-Ramos/dino-resnet-50')
@@ -19,14 +20,14 @@ def generate_vector(data):
 def db_fill(client):
 
     txt=''
-    with open('/content/name of the animals.txt','r') as f:
+    with open( "animal_names.txt" ,'r') as f:
         txt = f.read().split('\n')
 
     images = []
     for i in txt:
-        files = glob.glob('/content/animals/animals/'+i + '/*.jpg')
+        files = glob.glob('/assets/archive/animals/animals/'+i + '/*.jpg')
     images.extend(files)
-    images.extend(['cat1.jpeg','cat2.jpeg','cat3.jpeg','dog1.jpeg','dog2.jpeg'])
+    images.extend(['cat1.jpg','cat2.jpg','cat3.jpg','dog1.jpg','dog2.jpg'])
 
     print(len(images))
 
@@ -64,6 +65,6 @@ def query(client, image):
 
 if __name__=="__main__": 
     client = connect()
-    # db_fill(client)
-    query(client,Image.open('dog1.jpeg'))
+    db_fill(client)
+    query(client,Image.open('dog1.jpg'))
     client.close()

@@ -1,4 +1,5 @@
 import weaviate
+import sys
 
 URL = ""
 APIKEY = ""
