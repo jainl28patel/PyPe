@@ -69,9 +69,9 @@ def query(client, text):
         return_metadata=wq.MetadataQuery(distance=True),
     )
 
-    for o in response.objects:
-        print(o.properties["title"], o.properties["release_date"].year)
-        print(f"Distance to query: {o.metadata.distance:.3f}\n")
+    for obj in response.objects:
+        print(obj.properties["title"], obj.properties["release_date"].year)
+        print(f"Distance to query: {obj.metadata.distance:.3f}\n")
 
 if __name__=="__main__": 
     client = connect()
