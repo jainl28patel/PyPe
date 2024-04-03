@@ -119,15 +119,15 @@ class Slave:
     def process_task(self, task_id: str):
         task = json.loads(self.request_queue.get_task(task_id))
         task_type = None
-        match task["type"]:
-            case "bash":
-                task_type = TaskType.BASH
-            case "python":
-                task_type = TaskType.PYTHON
-            case "python3":
-                task_type = TaskType.PYTHON3
-            case default:
-                task_type = TaskType.UNDEFINED
+
+        if task["type"]== "bash":
+            task_type = TaskType.BASH
+        elif task["type"]== "python":
+            task_type = TaskType.PYTHON
+        elif task["type"]== "python3":
+            task_type = TaskType.PYTHON3
+        else:
+            task_type = TaskType.UNDEFINED
         
         if(task_type == TaskType.BASH):
             return self.process_bash_task(task["action"])
