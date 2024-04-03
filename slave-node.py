@@ -153,11 +153,11 @@ class Slave:
         task = json.loads(self.request_queue.get_task(task_id))
         print("task : ", task)
         task_type = None
-        if task["type"] == "bash":
+        if task["type"]== "bash":
             task_type = TaskType.BASH
-        elif task["type"] == "python":
+        elif task["type"]== "python":
             task_type = TaskType.PYTHON
-        elif task["type"] == "python3":
+        elif task["type"]== "python3":
             task_type = TaskType.PYTHON3
         else:
             task_type = TaskType.UNDEFINED
