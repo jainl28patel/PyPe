@@ -6,6 +6,7 @@ import yaml
 from pathlib import Path
 import json 
 from heart_beat import nodes_health
+from TaskQueue import taskQueue
 
 class Node:
     def __init__(self) -> None:
@@ -60,9 +61,15 @@ class RoundRobin:
 
     def get_ip(self, task):
         with self.lock:
-            ip = self.task_to_ip[task][self.last_task_ip[task]]
-            self.last_task_ip[task] = (self.last_task_ip[task] + 1) % len(self.task_to_ip[task])
-            return ip
+            node_count = len(self.task_to_ip[task])
+            while node_count:
+                ip = self.task_to_ip[task][self.last_task_ip[task]]
+                self.last_task_ip[task] = (self.last_task_ip[task] + 1) % len(self.task_to_ip[task])
+                if nodes_health.node_urls[ip] == "up":
+                    return ip
+                node_count -= 1
+
+            return "down"
 
 def load_config():
     # load yaml
@@ -91,6 +98,11 @@ def handle_request(data):
 
     ip_dest = RR.get_ip(task)
     ip_list = NODE.get_all_ip()
+
+    # TODO: Add a service that periodically checks if ANY node that execute task is up
+    if ip_dest == "down":
+        taskQueue.add_task(task, task_id)
+        return
 
     # Send task to node
     for ip in ip_list:
@@ -156,6 +168,7 @@ def main():
 # Node health imported from heart_beat.py
 NODE = None
 RR = None
+QUEUE = None
 
 if __name__ == "__main__":
     main()
