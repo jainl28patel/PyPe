@@ -8,15 +8,17 @@ import subprocess
 import sqlite3
 from enum import Enum
 from time import sleep 
+
 # required
 NODE_NAME = "node1"
-NODE_IP='10.61.119.144'
-MASTER_IP=""
-HEARTBEAT_PORT=9000
 
 # global variables
+NODE_IP=""
+MASTER_IP=""
+HEARTBEAT_PORT=0
 slave = None
 
+# node db stores
 '''
     {
         task_id: str,
@@ -27,6 +29,29 @@ slave = None
         },
         host_ip: str,
         host_port: int
+    }
+'''
+
+
+# master to slave
+'''
+    {
+        task_id: str,
+        task: str
+        to_execute: int
+    }
+'''
+
+
+# client to slave
+'''
+    {
+        task_id: str,
+        data: {
+            type: str,
+            response: str,
+            action: str
+        }
     }
 '''
 
@@ -195,13 +220,22 @@ class Slave:
         
 def load_config():
     # load yaml
-    global slave,MASTER_IP,HEARTBEAT_PORT
+    global slave,MASTER_IP,HEARTBEAT_PORT,NODE_IP
     config_path = Path("config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
-        return
+        return 0
     with open('config.yaml') as file:
         config = yaml.full_load(file)
+        for node in config["nodes"]:
+            name = next(iter(node))
+            if(name == NODE_NAME):
+                NODE_IP = node[name]["ip"]
+                break
+        else:
+            print(f"NODE_NAME: {NODE_NAME} not found in config.")
+            return 0
+            
         MASTER_IP = config["master"]["ip"]
         HEARTBEAT_PORT = config["heartbeat-port"]
         for node in config["nodes"]:
