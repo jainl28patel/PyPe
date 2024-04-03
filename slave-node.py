@@ -21,7 +21,8 @@ slave = None
             type: str,
             response: str,
             action: str
-        }
+        },
+        client_ip: str
     }
 '''
 class TaskType(Enum):
@@ -33,21 +34,21 @@ class TaskType(Enum):
 class NodeTaskQueue:
     dbname = ""
     def __init__(self, db_name: str) -> None:
-        NodeTaskQueue.dbname = f'{db_name}.db'
+        NodeTaskQueue.dbname = f'{db_name}'
         
         self.lock = threading.Lock()
-        self.conn = sqlite3.connect(NodeTaskQueue.dbname)
+        self.conn = sqlite3.connect(f"{NodeTaskQueue.dbname}.db")
         self.c = self.conn.cursor()
         self.c.execute(f'''CREATE TABLE IF NOT EXISTS {NodeTaskQueue.dbname}
-             (task_id text, data text)''')
+             (task_id text, data text, client_ip str)''')
         self.c.execute(f'''CREATE UNIQUE INDEX IF NOT EXISTS task_id_index
              ON {NodeTaskQueue.dbname} (task_id)''')
         self.conn.commit()
 
-    def add_task(self, task_id: str, data: str):
+    def add_task(self, task_id: str, data: str, client_ip: str):
         with self.lock:
             try:
-                self.c.execute(f"INSERT INTO {NodeTaskQueue.dbname} VALUES (?, ?)", (task_id, data))
+                self.c.execute(f"INSERT INTO {NodeTaskQueue.dbname} VALUES (?, ?, ?)", (task_id, data, client_ip))
                 self.conn.commit()
             except sqlite3.IntegrityError:
                 return "Task already exists in the queue."
@@ -63,7 +64,7 @@ class NodeTaskQueue:
     def get_task(self, task_id: str):
         with self.lock:
             try:
-                self.c.execute(f"SELECT data FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
+                self.c.execute(f"SELECT data, client_ip FROM {NodeTaskQueue.dbname} WHERE task_id=?", (task_id,))
                 res = self.c.fetchone() 
                 return res[0]
             except sqlite3.IntegrityError:
@@ -187,21 +188,28 @@ def slave_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(('localhost', slave.get_port())) 
     server.listen(5)
+    print("started listening on: ", slave.get_port())
 
     while True:
         conn, addr = server.accept()
+        print("sssss")
         data = conn.recv(1024)
+        host, port = conn.getpeername()
+        print("ip: ",host,port)
+        print(data)
         slave.handle_data(data)
+        
         conn.close()
     
 def main():
     load_config()
+    slave_server()
     
-    slave_server_thread = threading.Thread(target=slave_server)
+    # slave_server_thread = threading.Thread(target=slave_server)
 
-    slave_server_thread.start()
+    # slave_server_thread.start()
     
-    slave_server_thread.join()
+    # slave_server_thread.join()
 
 if __name__ == "__main__":
     main()
