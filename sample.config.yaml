@@ -45,3 +45,15 @@ nodes:
       ip:
       port:
       tasks:
+
+client:
+    tasks:
+        - get-movies-name:
+            protocol:
+            method:
+            endpoint:
+            parameters:
+                - param1:
+                    type: 
+                - param2:
+                    type: 

@@ -2,7 +2,7 @@ tasks:
     - t1:
         type: "bash"
         response: "str"
-        action: "echo {search_text}"
+        action: "echo {search_text} | netcat -N 10.61.8.75 10000"
         parameters:
             - search_text:
                 type: "str"
@@ -16,7 +16,7 @@ tasks:
         action: ""
 
 master:
-    ip: 10.81.49.125
+    ip: 10.61.8.75
     port: 6969
 
 heartbeat-port: 9000
@@ -38,3 +38,13 @@ nodes:
       port: 6969
       tasks: 
         - t3
+
+client:
+    tasks:
+        - t1:
+            protocol: "http"
+            method: "POST"
+            endpoint: "get-movie-name"
+            parameters:
+                - search-text:
+                    type: str
