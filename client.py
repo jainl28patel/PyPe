@@ -1,65 +1,66 @@
-import aiohttp
+import socket
 import json
+import asyncio
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 
 def request_parser(request):
-    
-    task = (json.loads(request))["task"]
-    task_id = (json.loads(request))["task_id"]
-
+    if isinstance(request, dict):
+        task = request["task"]
+        task_id = request["task_id"]
+    else:
+        try:
+            task = (json.loads(request))["task"]
+            task_id = (json.loads(request))["task_id"]
+        except TypeError:
+            print("The request must be a dictionary or a JSON-formatted string.")
+            return None, None
     return (task, task_id)
 
 
-async def node_post(node_url, request):
-    
-    async with aiohttp.ClientSession() as session:
-        response = await session.post(url = node_url, json=request)
-        print(response.status)
-
-        return response
-
-
-async def node_get(node_url):
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(node_url) as response:
-            status = response.status
-            data = await response.json()
-            return (status, data)
+async def send_data_to_socket(url, data):
+    host, port = url.split(":")
+    reader, writer = await asyncio.open_connection(host, int(port))
+    writer.write(data.encode())
+    await writer.drain()
+    response = await reader.read(100)
+    writer.close()
+    await writer.wait_closed()
+    return response
 
 
-async def master(master_url, task, task_id):
-
-    data = { 
-                "task" : task, 
-                "task_id" : task_id, 
-            }
-
-    async with aiohttp.ClientSession() as session:
-        response = await session.post(url = master_url, json=data)
-        return response.status
+@app.route("/", methods=["GET"])
+def user_get_request():
+    tasks = [send_data_to_socket(node_url, "GET") for node_url in node_urls]
+    node_responses = asyncio.run(asyncio.gather(*tasks))
+    return jsonify([response.decode() for response in node_responses]), 200
 
 
-async def post_to_master(request, master_url):
+@app.route("/", methods=["POST"])
+async def user_post_request():
+    request_data = request.get_json()
+    task, task_id = request_parser(request_data)
+    await send_data_to_socket(
+        master_url, json.dumps({"task": task, "task_id": task_id})
+    )
+    tasks = [
+        asyncio.create_task(send_data_to_socket(node_url, json.dumps(request_data)))
+        for node_url in node_urls
+    ]
+    for task in asyncio.as_completed(tasks):
+        response = await task
+        response_data = json.loads(response.decode())
+        if response_data.get("status") == "yes":
+            for t in tasks:
+                t.cancel()  # cancel all other tasks
+            return jsonify(response_data), 200
+    return jsonify({"message": "Task cannot be performed"}), 500
 
-    task, task_id = request_parser(request)
-    status = await master(master_url, task, task_id)
-    print(status)
 
+node_urls = ["localhost:8080"]  # "localhost:8082", "localhost:8083", "localhost:8084"]
+master_url = "localhost:8000"
 
-async def post_to_nodes(request, node_urls):
-    
-    for node_url in node_urls:
-        status  = await node_post(node_url, request)
-        print(node_url, status)
-
-
-async def get_from_nodes(node_urls):
-
-    for node_url in node_urls:
-        status, response = await node_get(node_url)
-        print(status)
-        if(status == 200):
-            return response
-
-         
+if __name__ == "__main__":
+    app.run(port=80)
