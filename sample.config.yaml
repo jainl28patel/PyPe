@@ -1,16 +1,30 @@
 # type - "bash", "python", "https"
-# response - "text", "image", "blob"
+# response - "str", "image", "blob", "None"
+# parameters are optional
 
 tasks:
     - t1:
         type:
         response:
+        action: 
+        parameters:
+            - param1:
+                type:
+            - param2:
+                type:
+            - param3:
+                type:
     - t2:
         type:
         response:
+        action: 
     - t3:
         type: 
         response:
+        action: 
+        parameters:
+            - param1:
+                type:
 
 master:
     ip:
@@ -22,12 +36,12 @@ nodes:
   - node1:
       ip:
       port:
-      task:
+      tasks:
   - node2:
       ip:
       port:
-      task:
+      tasks:
   - node3:
       ip:
       port:
-      task:
+      tasks:
