@@ -16,7 +16,7 @@ tasks:
         action: ""
 
 master:
-    ip: 10.81.25.126
+    ip: 10.81.49.125
     port: 6969
 
 heartbeat-port: 9000

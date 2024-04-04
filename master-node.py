@@ -37,7 +37,7 @@ class Node_Health:
 def heartbeat_main(node_urls):
     global NODE_HEALTH
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('10.61.8.75', 9000))
+    sock.bind((MASTER_IP, HEARTBEAT_PORT))
     sock.listen(20)
 
     while True:
@@ -79,7 +79,7 @@ class Node:
             ret = []
             for node in self.node:
                 name = next(iter(node))
-                if task in node[name]["task"]:
+                if task in node[name]["tasks"]:
                     ret.append(node[name]["ip"])
             return ret
         
@@ -88,7 +88,8 @@ class Node:
             ret = set()
             for node in self.node:
                 name = next(iter(node))
-                ret.add(node[name]["task"])
+                for task in node[name]["tasks"]:
+                    ret.add(task)
             return ret
         
     def get_all_ip_port(self):
@@ -140,12 +141,15 @@ class RoundRobin:
 
 def load_config():
     # load yaml
+    global MASTER_IP, HEARTBEAT_PORT
     config_path = Path("config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
         return
     with open('config.yaml') as file:
         config = yaml.full_load(file)
+        MASTER_IP = config["master"]["ip"]
+        HEARTBEAT_PORT = config["heartbeat-port"]
         for node in config["nodes"]:
             NODE.add(node)
 
@@ -241,6 +245,8 @@ NODE = None
 RR = None
 TASKQUEUE = None
 NODE_HEALTH = None
+MASTER_IP=""
+HEARTBEAT_PORT=0
 
 if __name__ == "__main__":
     main()
