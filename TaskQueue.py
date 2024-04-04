@@ -27,6 +27,7 @@ class TaskQueue:
                 conn = get_db()
                 c = conn.cursor()
                 c.execute("INSERT INTO task_queue VALUES (?, ?)", (task_name, task_id))
+                print("Task added to queue.")
                 conn.commit()
             except sqlite3.IntegrityError:
                 return "Task already exists in the queue."
@@ -50,7 +51,7 @@ class TaskQueue:
                 conn = get_db()
                 c = conn.cursor()
                 c.execute("DELETE FROM task_queue WHERE task_id=?", (task_id,))
-                self.conn.commit()
+                conn.commit()
             except sqlite3.IntegrityError:
                 return "Task does not exist in the queue."
 
