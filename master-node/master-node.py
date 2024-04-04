@@ -67,7 +67,7 @@ def heartbeat_timeout(node_urls):
         # Debugging
         node_health_copy = NODE_HEALTH.get_data()
         print(node_health_copy)
-        sleep(30)
+        sleep(50)
 
 class Node:
     def __init__(self) -> None:
@@ -88,7 +88,7 @@ class Node:
             for node in self.node:
                 name = next(iter(node))
                 if task in node[name]["tasks"]:
-                    ret.append(node[name]["ip"])
+                    ret.append((node[name]["ip"],node[name]["port"]))
             return ret
         
     def get_task_list(self):
@@ -128,9 +128,8 @@ class RoundRobin:
         for task in node_list.get_task_list():
             self.task_to_ip[task] = []
             for ip in node_list.get_task_node_ip(task):
-                self.task_to_ip[task].append(ip[0])
+                self.task_to_ip[task].append(ip)
             self.last_task_ip[task] = 0
-
         self.lock = threading.Lock()
 
     def get_ip(self, task):
@@ -141,15 +140,15 @@ class RoundRobin:
             while node_count:
                 ip = self.task_to_ip[task][self.last_task_ip[task]]
                 self.last_task_ip[task] = (self.last_task_ip[task] + 1) % len(self.task_to_ip[task])
-                if node_health_copy[ip] == "up":
-                    return ip
+                if node_health_copy[ip[0]] == "up":
+                    return ip[0]
                 node_count -= 1
 
             return "down"
 
 def load_config():
     # load yaml
-    global MASTER_IP, HEARTBEAT_PORT
+    global MASTER_IP, HEARTBEAT_PORT, MASTER_PORT
     config_path = Path("/Users/jainilpatel/Projects/fault-tolerant-loadBalancer/config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
@@ -158,6 +157,7 @@ def load_config():
         config = yaml.full_load(file)
         MASTER_IP = config["master"]["ip"]
         HEARTBEAT_PORT = config["heartbeat-port"]
+        MASTER_PORT = config["master"]["port"]
         for node in config["nodes"]:
             NODE.add(node)
 
@@ -209,7 +209,7 @@ def handle_request(data):
 def server():
     # Listen for incoming headers and send to respective nodes or stores in queue
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('localhost', 8000))    # later change to master node IP as per yaml file
+    server.bind((MASTER_IP,MASTER_PORT))    # later change to master node IP as per yaml file
     server.listen(5)
 
     # handle incoming requests using different threads
@@ -264,6 +264,7 @@ TASKQUEUE = None
 NODE_HEALTH = None
 MASTER_IP=""
 HEARTBEAT_PORT=0
+MASTER_PORT=0
 
 if __name__ == "__main__":
     main()

@@ -40,7 +40,7 @@ def db_fill():
     image_paths = []
     for i in txt:
         files = glob.glob('/assets/archive/animals/animals/'+i + '/*.jpg')
-        image_path.extend(files)
+        image_paths.extend(files)
 
     vectors = []
     for i, image_path in enumerate(image_paths):
