@@ -8,6 +8,7 @@ import subprocess
 import sqlite3
 from enum import Enum
 from time import sleep 
+from utils import *
 
 # required
 NODE_NAME = "node1"
@@ -17,6 +18,7 @@ NODE_IP=""
 MASTER_IP=""
 HEARTBEAT_PORT=0
 slave = None
+TASKS = None
 
 # node db stores
 '''
@@ -64,7 +66,26 @@ def get_db():
         mydata.conn = sqlite3.connect(f'task_{NODE_NAME}.db')
     return mydata.conn
 
+class TaskList:
+    def __init__(self) -> None:
+        self.task_list = {}
 
+    def add_task(self, task_name: str, type: str, response: str, action: str, parameters: dict):
+        self.task_list[task_name] = {"type":type, "response":response, "action": action, "parameters": parameters}
+        
+    def get_task_names(self):
+        return [i for i in self.task_list.keys()]
+    
+    def get_task_parameter_names(self, task_name: str):
+        return [i for i in self.task_list[task_name]["parameters"].keys()]
+    
+    def get_task_parameters(self, task_name: str):
+        return self.task_list[task_name]["parameters"]
+    
+    def get_task_action(self, task_name: str):
+        return self.task_list[task_name]["action"]
+    
+    
 class TaskType(Enum):
     BASH = 1
     PYTHON = 2
@@ -140,17 +161,11 @@ class NodeTaskQueue:
         conn.close()
 
 class Slave:
-    def __init__(self) -> None:
-        self.name = NODE_NAME
-        self.port = 0
-        self.task = ""
-        self.request_queue = NodeTaskQueue(f'task_{NODE_NAME}')
-
-    def __init__(self, port: int, task: str) -> None:
+    def __init__(self, port: int) -> None:
         # TODO: add multiple tasks
         self.name = NODE_NAME
         self.port = port
-        self.task = task
+        self.task_list = TaskList()
         self.request_queue = NodeTaskQueue(f'task_{NODE_NAME}')
 
     def get_port(self):
@@ -159,8 +174,11 @@ class Slave:
     def get_node_name(self):
         return self.name
     
-    def get_task(self):
-        return self.task
+    def get_node_tasks(self):
+        return self.task_list.get_task_names()
+    
+    def add_node_task(self, task_name: str, type: str, response: str, action: str, parameters: dict):
+        self.task_list.add_task(task_name, type, response, action, parameters)
     
     def pop_task_id(self, task_id : str):
         self.request_queue.remove_task(task_id)
@@ -208,7 +226,7 @@ class Slave:
         # handles the task given from the master
         # or pops it from queue
         if (int(to_execute) == 1):
-            if (task == self.task):
+            if (task in self.get_node_tasks()):
                 # TODO: Change this
                 print(self.process_task(task_id))
             else:
@@ -220,7 +238,7 @@ class Slave:
         
 def load_config():
     # load yaml
-    global slave,MASTER_IP,HEARTBEAT_PORT,NODE_IP
+    global slave,TASKS,MASTER_IP,HEARTBEAT_PORT,NODE_IP
     config_path = Path("config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
@@ -238,12 +256,36 @@ def load_config():
             
         MASTER_IP = config["master"]["ip"]
         HEARTBEAT_PORT = config["heartbeat-port"]
+        
         for node in config["nodes"]:
             node_name = next(iter(node))
             if(node_name == NODE_NAME):
                 port = int(node[node_name]["port"])
-                task = node[node_name]["task"]
-                slave = Slave(port=port,task=task) 
+                tasks = node[node_name]["tasks"]
+                slave = Slave(port=port)
+                
+                for task in config["tasks"]:
+                    task_name = next(iter(task))
+                    if task_name not in tasks:
+                        continue 
+                    task_type = task[task_name]["type"]
+                    task_response = task[task_name]["response"]
+                    task_action = task[task_name]["action"]
+                    task_parameters = dict()
+                    if "parameters" in task[task_name].keys():
+                        for param in task[task_name]["parameters"]:
+                            param_name = next(iter(param))
+                            param_type = param[param_name]["type"]
+                            
+                            task_parameters[param_name] = param_type
+                    params_in_action=set(get_parameters_from_action(task_action))
+                    
+                    if params_in_action != set([i for i in task_parameters.keys()]):
+                        print(f"Parameters mismatch in task: {task_name}")
+                        return 0
+                    
+                    slave.add_node_task(task_name,task_type,task_response, task_action, task_parameters)
+                                          
                 break
         else:
             print("NODE_NAME: {} not found in the config.yaml".format(NODE_NAME))
