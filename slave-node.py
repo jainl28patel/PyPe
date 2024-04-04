@@ -26,9 +26,8 @@ TASKS = None
     {
         task_id: str,
         data: {
-            type: str,
-            response: str,
-            action: str
+            param1: str,
+            ...
         },
         host_ip: str,
         host_port: int
@@ -51,9 +50,8 @@ TASKS = None
     {
         task_id: str,
         data: {
-            type: str,
-            response: str,
-            action: str
+            param1: str,
+            ...
         }
     }
 '''
@@ -200,7 +198,7 @@ class Slave:
     
     async def process_task(self, task_id: str, task_name: str):
         with self.lock:
-            task = json.loads(self.request_queue.get_task(task_id))
+            task = json.loads(self.request_queue.get_task(task_id))["data"]
             print("task : ", task)
             task_type = None
             if task["type"]== "bash":
