@@ -12,7 +12,7 @@ def handle_client(conn):
             break
         request = json.loads(data.decode())
         print(f"Received {request} from client")
-        print(f"Processing task {request['task']} with id {request['task_id']}")
+        print(f"Processing task {request['data']} with id {request['task_id']}")
         time.sleep(random.randint(1, 10))
         # Process the task and determine the status
         status = "yes"  # or "yes" based on the task processing result

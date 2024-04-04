@@ -2,22 +2,24 @@ import socket
 import json
 import asyncio
 from flask import Flask, request, jsonify
+import uuid
 
 app = Flask(__name__)
 
 
 def request_parser(request):
     if isinstance(request, dict):
-        task = request["task"]
-        task_id = request["task_id"]
+        search_text = request["search-text"]
     else:
         try:
-            task = (json.loads(request))["task"]
-            task_id = (json.loads(request))["task_id"]
+            search_text = (json.loads(request))["search-text"]
         except TypeError:
             print("The request must be a dictionary or a JSON-formatted string.")
             return None, None
-    return (task, task_id)
+    # do this later
+    task_id = str(uuid.uuid4())
+    task = "t1"
+    return (task, task_id, search_text)
 
 
 async def send_data_to_socket(url, data):
@@ -41,12 +43,18 @@ def user_get_request():
 @app.route("/", methods=["POST"])
 async def user_post_request():
     request_data = request.get_json()
-    task, task_id = request_parser(request_data)
+    task, task_id, search_text = request_parser(request_data)
     await send_data_to_socket(
-        master_url, json.dumps({"task": task, "task_id": task_id})
+        master_url,
+        json.dumps({"task_id": task_id, "task": task}),
     )
     tasks = [
-        asyncio.create_task(send_data_to_socket(node_url, json.dumps(request_data)))
+        asyncio.create_task(
+            send_data_to_socket(
+                node_url,
+                json.dumps({"task_id": task_id, "data": {"search_text": search_text}}),
+            )
+        )
         for node_url in node_urls
     ]
     for task in asyncio.as_completed(tasks):
@@ -64,3 +72,11 @@ master_url = "localhost:8000"
 
 if __name__ == "__main__":
     app.run(port=80)
+
+
+# {
+#     "task_id":uuid_string
+#     "data":{
+#         "search-text":hfskjhsjkf
+#     }
+# }
