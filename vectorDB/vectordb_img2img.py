@@ -43,7 +43,7 @@ def db_fill():
 
     image_paths = []
     for i in txt:
-        files = glob.glob('/assets/archive/animals/animals/'+i + '/*.jpg')
+        files = glob.glob('./assets/archive/animals/animals/'+i + '/*.jpg')
         image_paths.extend(files)
 
     vectors = []
@@ -88,7 +88,7 @@ def handle_requests(conn,data):
     
 if __name__ == "__main__":
     db_fill()
-    sample_image = Image.open('./test/dog1.jpeg')
+    sample_image = Image.open('./test/dog.jpeg')
     print(query_image(sample_image))
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
