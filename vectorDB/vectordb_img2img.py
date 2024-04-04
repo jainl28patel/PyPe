@@ -32,8 +32,15 @@ hnsw_index = None  # Will be initialized in db_fill
 
 def db_fill():
     global hnsw_index
-    image_folder = "./assets/"
-    image_paths = glob.glob(os.path.join(image_folder, '*.jpg'))  # Adjust pattern if necessary
+
+    txt=''
+    with open( "animals.txt" ,'r') as f:
+        txt = f.read().split('\n')
+
+    image_paths = []
+    for i in txt:
+        files = glob.glob('/assets/archive/animals/animals/'+i + '/*.jpg')
+        image_path.extend(files)
 
     vectors = []
     for i, image_path in enumerate(image_paths):
@@ -51,8 +58,7 @@ def db_fill():
 
     print(f"Inserted {len(image_paths)} images into MongoDB and HNSWlib index.")
 
-def query_image(input_image_path):
-    input_image = Image.open(input_image_path)
+def query_image(input_image):
     input_vector = generate_vector(input_image)
 
     labels, distances = hnsw_index.knn_query(input_vector, k=1)
@@ -66,5 +72,5 @@ def query_image(input_image_path):
 
 if __name__ == "__main__":
     db_fill()
-    sample_image_path = './test/image.jpg'
-    print(query_image(sample_image_path))
+    sample_image = Image.open('./test/dog1.jpeg')
+    print(query_image(sample_image))

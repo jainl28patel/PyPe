@@ -150,11 +150,11 @@ class RoundRobin:
 def load_config():
     # load yaml
     global MASTER_IP, HEARTBEAT_PORT
-    config_path = Path("config.yaml")
+    config_path = Path("/Users/jainilpatel/Projects/fault-tolerant-loadBalancer/config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
         return
-    with open('config.yaml') as file:
+    with open('../config.yaml') as file:
         config = yaml.full_load(file)
         MASTER_IP = config["master"]["ip"]
         HEARTBEAT_PORT = config["heartbeat-port"]

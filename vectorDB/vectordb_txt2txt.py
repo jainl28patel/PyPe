@@ -76,14 +76,15 @@ def query_text(input_text):
 
 def handle_requests(conn,data):
     input_text = data.decode("utf-8")
-    response = query_text(input_text)
+    response = query_text(input_text)+"\n"
     conn.sendall(response.encode("utf-8"))
+    conn.close()
     
 
 if __name__ == "__main__":
     db_fill()
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('localhost', 10000))
+    sock.bind(('10.61.8.75', 10000))
     sock.listen(10)
     while True:
         conn, addr = sock.accept()
