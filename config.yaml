@@ -23,21 +23,21 @@ heartbeat-port: 9000
 
 nodes:
   - node1:
-      ip: 10.81.49.125
+      ip: 10.61.119.144
       port: 6969
       tasks:
         - t1
         - t2
-  - node2:
-      ip: 10.81.49.126
-      port: 6969
-      tasks: 
-        - t2
-  - node3:
-      ip: 10.81.49.127
-      port: 6969
-      tasks: 
-        - t3
+#   - node2:
+#       ip: 10.81.49.126
+#       port: 6969
+#       tasks: 
+#         - t2
+#   - node3:
+#       ip: 10.81.49.127
+#       port: 6969
+#       tasks: 
+#         - t3
 
 client:
     tasks:
