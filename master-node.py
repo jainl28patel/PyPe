@@ -187,7 +187,10 @@ def handle_request(data):
         return
 
     # Send task to node
+    health_data = NODE_HEALTH.get_data()
     for ip in ip_list:
+        if health_data[ip[0]] == "down":
+            continue
         if ip[0] == ip_dest:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             print(f"Connecting to {ip[0]}:{ip[1]}")
