@@ -4,6 +4,10 @@ from transformers import AutoFeatureExtractor, ResNetModel
 from PIL import Image
 from pymongo import MongoClient
 import os, glob
+import socket
+import io, base64
+from PIL import Image
+import threading
 
 # Connect to MongoDB
 def connect_mongo():
@@ -70,7 +74,31 @@ def query_image(input_image):
     else:
         return "No matching image found."
 
+def handle_requests(conn,data):
+    base64_str = data.decode("utf-8")
+    img = Image.open(io.BytesIO(base64.decodebytes(bytes(base64_str, "utf-8"))))
+    
+    path = query_image(img)
+
+    image = open(path, 'rb')
+    image_read = image.read()
+    response = base64.encodebytes(image_read) 
+    conn.sendall(response.encode("utf-8"))
+    conn.close()
+    
 if __name__ == "__main__":
     db_fill()
     sample_image = Image.open('./test/dog1.jpeg')
     print(query_image(sample_image))
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('10.61.8.75', 10001))
+    sock.listen(10)
+    while True:
+        conn, addr = sock.accept()
+        data = conn.recv(1024)
+        if not data:
+            continue
+        thread = threading.Thread(target=handle_requests, args=(conn, data))
+        thread.start()
+    sock.close()
