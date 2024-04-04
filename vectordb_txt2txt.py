@@ -5,6 +5,8 @@ import pandas as pd
 from datetime import datetime, timezone
 from sentence_transformers import SentenceTransformer
 from pymongo import MongoClient
+import socket
+import threading
 
 # Connect to MongoDB
 def connect_mongo():
@@ -70,8 +72,24 @@ def query_text(input_text):
         return result['text']
     else:
         return "No matching text found."
+    
+
+def handle_requests(conn,data):
+    input_text = data.decode("utf-8")
+    response = query_text(input_text)
+    conn.sendall(response.encode("utf-8"))
+    
 
 if __name__ == "__main__":
     db_fill()
-    sample_query = "A green monster living in swamp"
-    print(query_text(sample_query))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('localhost', 10000))
+    sock.listen(10)
+    while True:
+        conn, addr = sock.accept()
+        data = conn.recv(1024)
+        if not data:
+            continue
+        thread = threading.Thread(target=handle_requests, args=(conn, data))
+        thread.start()
+    sock.close()
