@@ -2,7 +2,7 @@ tasks:
     - t1:
         type: "bash"
         response: "str"
-        action: "echo {search_text} > hi.txt"
+        action: "echo {search_text}"
         parameters:
             - search_text:
                 type: "str"
@@ -16,7 +16,7 @@ tasks:
         action: ""
 
 master:
-    ip: 10.61.8.75
+    ip: 10.81.25.126
     port: 6969
 
 heartbeat-port: 9000

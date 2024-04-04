@@ -84,6 +84,9 @@ class TaskList:
     def get_task_action(self, task_name: str) -> str:
         return self.task_list[task_name]["action"]
     
+    def get_task_type(self, task_name: str) -> str:
+        return self.task_list[task_name]["type"]
+    
     
 class TaskType(Enum):
     BASH = 1
@@ -175,87 +178,85 @@ class Slave:
         return self.task_list.get_task_names()
     
     def add_node_task(self, task_name: str, type: str, response: str, action: str, parameters: dict):
-        with self.lock:
-            self.task_list.add_task(task_name, type, response, action, parameters)
+        # with self.lock:
+        self.task_list.add_task(task_name, type, response, action, parameters)
     
     def pop_task_id(self, task_id : str):
-        with self.lock:
-            self.request_queue.remove_task(task_id)
+        # with self.lock:
+        self.request_queue.remove_task(task_id)
     
-    async def handle_request(self, data: str, host_ip: str, host_port: int):
+    def handle_request(self, data: str, host_ip: str, host_port: int):
         # parses data from client and stores in the queue
-        with self.lock:
-            res = json.loads(data)
-            self.request_queue.add_task(res["task_id"],json.dumps(res["data"]),host_ip,host_port)
+        # with self.lock:
+        res = json.loads(data)
+        self.request_queue.add_task(res["task_id"],json.dumps(res["data"]),host_ip,host_port)
         
     def process_bash_task(self, task_name: str, payload: dict ):
         if set(self.task_list.get_task_parameter_names(task_name)) != set([i for i in payload.keys()]):
             print("Error in processing: parameters mismatch.")
             return None
-        action = self.task_list.get_task_action(task_name).format_map(dict)
+        action = self.task_list.get_task_action(task_name).format_map(payload)
+        print("action: ",action)
         output = str(subprocess.check_output(action, shell=True))
         return output
     
-    async def process_task(self, task_id: str, task_name: str):
-        with self.lock:
-            task = json.loads(self.request_queue.get_task(task_id))["data"]
-            print("task : ", task)
-            task_type = None
-            if task["type"]== "bash":
-                task_type = TaskType.BASH
-            elif task["type"]== "python":
-                task_type = TaskType.PYTHON
-            elif task["type"]== "python3":
-                task_type = TaskType.PYTHON3
-            else:
-                task_type = TaskType.UNDEFINED
-            
-            if(task_type == TaskType.BASH):
-                res =  self.process_bash_task(task_name,task)
-                return res
-                
-            return None
-
-    async def handle_data(self, data: str, host_ip: str, host_port: int, conn: socket.socket):
-        # either data from client or master
-        with self.lock:
-            res = json.loads(data)
-            for key in res.keys():
-                if key == "data":
-                    self.handle_request(data, host_ip, host_port)
-                    self.task_connections[res["task_id"]] = conn                   
-                    break
-                elif key == "task":
-                    # master
-                    await self.handle_task(int(res["task_id"]),res["task"],res["to_execute"])
-                    conn.close()
-                    break
-            else:
-                conn.close()
-            
-            return None
+    def process_task(self, task_id: str, task_name: str):
+        # with self.lock:
+        task = json.loads(self.request_queue.get_task(task_id))
+        print("task : ", task)
         
-    async def handle_task(self, task_id: str, task: str, to_execute: str):
+        if(self.task_list.get_task_type(task_name) == "bash"):
+            res =  self.process_bash_task(task_name,task)
+            return res
+            
+        return None
+
+    def handle_data(self, data: str, host_ip: str, host_port: int, conn: socket.socket):
+        # either data from client or master
+        # with self.lock:
+        res = json.loads(data)
+        for key in res.keys():
+            if key == "data":
+                self.handle_request(data, host_ip, host_port)
+                self.task_connections[res["task_id"]] = conn
+                print("task conn: ",self.task_connections)                   
+                break
+            elif key == "task":
+                # master
+                self.handle_task(res["task_id"],res["task"],res["to_execute"])
+                conn.close()
+                break
+        else:
+            conn.close()
+        
+        return None
+        
+    def handle_task(self, task_id: str, task: str, to_execute: str):
         # handles the task given from the master
         # or pops it from queue
-        with self.lock:
-            if (int(to_execute) == 1):
-                if (task in self.get_node_tasks()):
-                    # send processed result to the client
-                    
-                    out = self.process_task(task_id, task)
-                    if out != None:
-                        self.task_connections[task_id].sendall(json.dumps({ "status": "200", "response": out})) 
-                    else:
-                        self.task_connections[task_id].sendall(json.dumps({ "status": "500", "response": "None"}))
+        # with self.lock:
+        if (int(to_execute) == 1):
+            if (task in self.get_node_tasks()):
+                # send processed result to the client
+                print("Task received: ", task_id)
+                out = self.process_task(task_id, task)
+                print("task conn lol: ",self.task_connections)                   
+                if out != None:
+                    print("out: ",out)
+                    print("task conn aa: ",self.task_connections)                   
+                    self.task_connections[task_id].sendall(json.dumps({ "status": "200", "response": out}).encode()) 
                 else:
-                    print(f"Task: {task} not supported.")
-                    self.task_connections[task_id].sendall(json.dumps({ "status": "500", "response": "None"}))                     
-                self.task_connections[task_id].close()
-                self.task_connections.pop(task_id)
-            
-            # pop the task_id
-            self.pop_task_id(task_id)
+                    print("out: ",out)
+                    print("task conn bb: ",self.task_connections)                   
+                    self.task_connections[task_id].sendall(json.dumps({ "status": "500", "response": "None"}).encode())
+            else:
+                print(f"Task: {task} not supported.")
+                self.task_connections[task_id].sendall(json.dumps({ "status": "500", "response": "None"}).encode())                     
+            self.task_connections[task_id].close()
+            self.task_connections.pop(task_id)
+        
+        # pop the task_id
+        self.pop_task_id(task_id)
         
         
 def load_config():
@@ -316,7 +317,7 @@ def load_config():
     return 1
 
     
-async def slave_server():
+def slave_server():
     global slave
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((NODE_IP, slave.get_port())) 
@@ -329,7 +330,9 @@ async def slave_server():
         host, port = conn.getpeername()
         print(f"recieved from ip: {host} port: {port}")
         print(data)
-        res = await slave.handle_data(data,host,port, conn)
+        # res = slave.handle_data()
+        
+        threading.Thread(target=slave.handle_data, args=(data,host,port, conn)).start()
         
 
 def start_health():
