@@ -37,7 +37,7 @@ class Node_Health:
 def heartbeat_main(node_urls):
     global NODE_HEALTH
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('10.61.8.75', 9000))
+    sock.bind((MASTER_IP, HEARTBEAT_PORT))
     sock.listen(20)
 
     while True:
@@ -45,10 +45,15 @@ def heartbeat_main(node_urls):
         data = conn.recv(1024).decode()
         data = json.loads(data)
         host, port = conn.getpeername()
+        print(f"Received heartbeat from {host}")
         if data["status"] == "up":
             NODE_HEALTH.update_health(addr[0], "up")
         else:
             NODE_HEALTH.update_health(addr[0], "down")
+        
+        #debugging
+        print("Health : ", NODE_HEALTH.get_data())
+
         conn.close()
 
 def heartbeat_timeout(node_urls):
@@ -59,7 +64,10 @@ def heartbeat_timeout(node_urls):
             if node_health_copy[url] == "up":
                 if (time.time() - NODE_HEALTH.last_heartbeat_time[url]) > 30:
                     NODE_HEALTH.update_health(url, "down")
-        sleep(20)
+        # Debugging
+        node_health_copy = NODE_HEALTH.get_data()
+        print(node_health_copy)
+        sleep(30)
 
 class Node:
     def __init__(self) -> None:
@@ -79,7 +87,7 @@ class Node:
             ret = []
             for node in self.node:
                 name = next(iter(node))
-                if task in node[name]["task"]:
+                if task in node[name]["tasks"]:
                     ret.append(node[name]["ip"])
             return ret
         
@@ -88,7 +96,8 @@ class Node:
             ret = set()
             for node in self.node:
                 name = next(iter(node))
-                ret.add(node[name]["task"])
+                for task in node[name]["tasks"]:
+                    ret.add(task)
             return ret
         
     def get_all_ip_port(self):
@@ -119,7 +128,7 @@ class RoundRobin:
         for task in node_list.get_task_list():
             self.task_to_ip[task] = []
             for ip in node_list.get_task_node_ip(task):
-                self.task_to_ip[task].append(ip)
+                self.task_to_ip[task].append(ip[0])
             self.last_task_ip[task] = 0
 
         self.lock = threading.Lock()
@@ -140,12 +149,15 @@ class RoundRobin:
 
 def load_config():
     # load yaml
+    global MASTER_IP, HEARTBEAT_PORT
     config_path = Path("config.yaml")
     if not config_path.exists():
         print("config.yaml not found.") 
         return
     with open('config.yaml') as file:
         config = yaml.full_load(file)
+        MASTER_IP = config["master"]["ip"]
+        HEARTBEAT_PORT = config["heartbeat-port"]
         for node in config["nodes"]:
             NODE.add(node)
 
@@ -162,25 +174,34 @@ def handle_request(data):
     data = json.loads(data)
     task = data["task"]
     task_id = data["task_id"]
-    data["to_execute"] = False
+    data["to_execute"] = 0
 
     ip_dest = RR.get_ip(task)
-    ip_list = NODE.get_all_ip_port()
+    ip_list = NODE.get_task_node_ip(data["task"])
+    print(f"IP List: {ip_list}")
+
+    print(f"Task: {task}, Task ID: {task_id}, IP: {ip_dest}")
 
     if ip_dest == "down":
         TASKQUEUE.add_task(task, task_id)
         return
 
     # Send task to node
+    health_data = NODE_HEALTH.get_data()
     for ip in ip_list:
+        if health_data[ip[0]] == "down":
+            continue
         if ip[0] == ip_dest:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            print(f"Connecting to {ip[0]}:{ip[1]}")
             sock.connect((ip[0], ip[1]))
-            data["to_execute"] = True
+            data["to_execute"] = 1
+            print(f"Sending data: {data}")
             sock.sendall(json.dumps(data).encode())
             sock.close()
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            print(f"Connecting to {ip[0]}:{ip[1]}")
             sock.connect((ip[0], ip[1]))
             sock.sendall(json.dumps(data).encode())
             sock.close()
@@ -241,6 +262,8 @@ NODE = None
 RR = None
 TASKQUEUE = None
 NODE_HEALTH = None
+MASTER_IP=""
+HEARTBEAT_PORT=0
 
 if __name__ == "__main__":
     main()
